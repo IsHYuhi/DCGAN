@@ -1,12 +1,18 @@
+from collections import OrderedDict
 from models.Generator import Generator
 from models.Discriminator import Discriminator
 from utils.data_set import make_datapath_list, GAN_Img_Dataset, ImageTransform
 from torchvision import models
+from tqdm import tqdm
 import torch.optim as optim
 import torch.nn as nn
-from tqdm import tqdm
+import matplotlib.pyplot as plt
 import time
 import torch
+import os
+
+torch.manual_seed(44)
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -20,9 +26,46 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 
-def train_model(G, D, dataloader, num_epochs):
+def fix_model_state_dict(state_dict):
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k
+        if name.startswith('module.'):
+            name = name[7:] # remove 'module.' of dataparallel
+        new_state_dict[name] = v
+    return new_state_dict
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def plot_log(data, save_model_name='model'):
+    plt.cla()
+    plt.plot(data['G'], label='G_loss ')
+    plt.plot(data['D'], label='D_loss ')
+    plt.legend()
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.title('Loss')
+    plt.savefig('./logs/'+save_model_name+'.png')
+
+def check_dir():
+    if not os.path.exists('./logs'):
+        os.mkdir('./logs')
+    if not os.path.exists('./checkpoints'):
+        os.mkdir('./checkpoints')
+
+def train_model(G, D, dataloader, num_epochs, save_model_name='model'):
+
+    check_dir()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    G.to(device)
+    D.to(device)
+
+    """use GPU in parallel"""
+    if device == 'cuda':
+        G = torch.nn.DataParallel(G)
+        D = torch.nn.DataParallel(D)
+        print("parallel mode")
+
     print("device:{}".format(device))
     g_lr, d_lr = 0.0001, 0.0004
     beta1, beta2 = 0.0, 0.9
@@ -32,10 +75,7 @@ def train_model(G, D, dataloader, num_epochs):
     criterion = nn.BCEWithLogitsLoss(reduction='mean')
 
     z_dim = 20
-    mini_batch_size = 64
-
-    G.to(device)
-    D.to(device)
+    mini_batch_size = 256
 
     G.train()
     D.train()
@@ -47,6 +87,10 @@ def train_model(G, D, dataloader, num_epochs):
 
     iteration = 1
     logs = []
+
+    g_losses = []
+    d_losses = []
+    losses = {'G':g_losses, 'D':d_losses}
 
     for epoch in range(num_epochs):
 
@@ -108,11 +152,20 @@ def train_model(G, D, dataloader, num_epochs):
 
         t_epoch_finish = time.time()
         print('-----------')
-        print('epoch {} || Epoch_D_Loss:{:.4f} || Epoch_G_Loss:{:.4f}'.format(epoch, epoch_d_loss/batch_size, epoch_g_loss/batch_size))
+        print('epoch {} || Epoch_D_Loss:{:.4f} || Epoch_G_Loss:{:.4f}'.format(epoch+1, epoch_d_loss/batch_size, epoch_g_loss/batch_size))
         print('timer: {:.4f} sec.'.format(t_epoch_finish - t_epoch_start))
         t_epoch_start = time.time()
 
-    return G, E
+        losses['G'].append(epoch_g_loss/batch_size)
+        losses['D'].append(epoch_d_loss/batch_size)
+
+        plot_log(losses, save_model_name)
+
+        if((epoch+1)%10 == 0):
+            torch.save(G.state_dict(), 'checkpoints/G_'+save_model_name+'_'+str(epoch+1)+'.pth')
+            torch.save(D.state_dict(), 'checkpoints/D_'+save_model_name+'_'+str(epoch+1)+'.pth')
+
+    return G, D
 
 def main():
     G = Generator(z_dim=20, image_size=64)
@@ -120,16 +173,16 @@ def main():
     G.apply(weights_init)
     D.apply(weights_init)
 
-    train_img_list=make_datapath_list()
+    train_img_list=make_datapath_list(num=1000)
     mean = (0.5,)
     std = (0.5,)
     train_dataset = GAN_Img_Dataset(file_list=train_img_list, transform=ImageTransform(mean, std))
 
-    batch_size = 64
+    batch_size = 256
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    num_epochs = 200
-    G_update, D_update = train_model(G, D, dataloader=train_dataloader, num_epochs=num_epochs)
+    num_epochs = 100
+    G_update, D_update = train_model(G, D, dataloader=train_dataloader, num_epochs=num_epochs, save_model_name='DCGAN')
 
 
 if __name__ == "__main__":
