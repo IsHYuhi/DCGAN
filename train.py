@@ -92,7 +92,7 @@ def train_model(G, D, dataloader, num_epochs, save_model_name='model'):
     d_losses = []
     losses = {'G':g_losses, 'D':d_losses}
 
-    for epoch in range(num_epochs):
+    for epoch in range(num_epochs+1):
 
         t_epoch_start = time.time()
         epoch_g_loss = 0.0
@@ -152,7 +152,7 @@ def train_model(G, D, dataloader, num_epochs, save_model_name='model'):
 
         t_epoch_finish = time.time()
         print('-----------')
-        print('epoch {} || Epoch_D_Loss:{:.4f} || Epoch_G_Loss:{:.4f}'.format(epoch+1, epoch_d_loss/batch_size, epoch_g_loss/batch_size))
+        print('epoch {} || Epoch_D_Loss:{:.4f} || Epoch_G_Loss:{:.4f}'.format(epoch, epoch_d_loss/batch_size, epoch_g_loss/batch_size))
         print('timer: {:.4f} sec.'.format(t_epoch_finish - t_epoch_start))
         t_epoch_start = time.time()
 
@@ -161,7 +161,7 @@ def train_model(G, D, dataloader, num_epochs, save_model_name='model'):
 
         plot_log(losses, save_model_name)
 
-        if((epoch+1)%10 == 0):
+        if(epoch%10 == 0):
             torch.save(G.state_dict(), 'checkpoints/G_'+save_model_name+'_'+str(epoch+1)+'.pth')
             torch.save(D.state_dict(), 'checkpoints/D_'+save_model_name+'_'+str(epoch+1)+'.pth')
 

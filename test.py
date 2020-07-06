@@ -53,7 +53,6 @@ mean = (0.5,)
 std = (0.5,)
 train_dataset = GAN_Img_Dataset(file_list=train_img_list, transform=ImageTransform(mean, std))
 
-batch_size = 256
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 batch_iterator = iter(train_dataloader)
