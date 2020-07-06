@@ -162,8 +162,8 @@ def train_model(G, D, dataloader, num_epochs, save_model_name='model'):
         plot_log(losses, save_model_name)
 
         if(epoch%10 == 0):
-            torch.save(G.state_dict(), 'checkpoints/G_'+save_model_name+'_'+str(epoch+1)+'.pth')
-            torch.save(D.state_dict(), 'checkpoints/D_'+save_model_name+'_'+str(epoch+1)+'.pth')
+            torch.save(G.state_dict(), 'checkpoints/G_'+save_model_name+'_'+str(epoch)+'.pth')
+            torch.save(D.state_dict(), 'checkpoints/D_'+save_model_name+'_'+str(epoch)+'.pth')
 
     return G, D
 
